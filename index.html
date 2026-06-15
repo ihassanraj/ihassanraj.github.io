@@ -13,7 +13,8 @@
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..700&family=Hanken+Grotesk:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..700&family=Hanken+Grotesk:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+<noscript><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..700&family=Hanken+Grotesk:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" /></noscript>
 
 <style>
   /* ============================================================
@@ -1062,7 +1063,7 @@
 <section class="about" id="about" aria-labelledby="about-title">
   <div class="about-grid">
     <div class="about-photo">
-      <img src="dp.png" alt="Portrait of Hassan Abdullah" />
+      <img src="dp.webp" width="1154" height="1370" loading="lazy" decoding="async" alt="Portrait of Hassan Abdullah" />
       <div class="about-photo__loc"><span class="dot" aria-hidden="true"></span><span>Lahore &middot; Remote (Global)</span></div>
     </div>
 
@@ -1107,7 +1108,6 @@
   </a>
 </footer>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function () {
   'use strict';
@@ -1164,9 +1164,43 @@
     });
   }
 
-  /* experience: grabbable, flick-to-spin 3D chain-link knot */
-  initKnot();
-  initDots();
+  /* lazy-load Experience effects only when that section is near the viewport */
+  var expActive = false, dotsStarted = false, knotStarted = false, threeLoading = false;
+  var expSection = document.getElementById('experience');
+  if (expSection && 'IntersectionObserver' in window) {
+    var expIO = new IntersectionObserver(function (entries) {
+      expActive = entries[0] && entries[0].isIntersecting;
+      if (expActive) {
+        if (!dotsStarted) { initDots(); dotsStarted = true; }
+        if (!knotStarted && !threeLoading) {
+          threeLoading = true;
+          loadThree(function () { threeLoading = false; initKnot(); knotStarted = true; });
+        }
+        if (window.__startDots) { window.__startDots(); }
+        if (window.__startKnot) { window.__startKnot(); }
+      }
+    }, { rootMargin: '380px 0px' });
+    expIO.observe(expSection);
+  } else {
+    expActive = true;
+    initDots();
+    loadThree(function () { initKnot(); });
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    expActive = !document.hidden && !!(expSection && expSection.getBoundingClientRect().bottom > 0 && expSection.getBoundingClientRect().top < window.innerHeight);
+    if (expActive && window.__startDots) { window.__startDots(); }
+    if (expActive && window.__startKnot) { window.__startKnot(); }
+  });
+
+  function loadThree(done) {
+    if (window.THREE) { done(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+    s.async = true;
+    s.onload = done;
+    document.head.appendChild(s);
+  }
 
   function initKnot() {
     var canvas = document.getElementById('knotCanvas');
@@ -1247,8 +1281,10 @@
     canvas.addEventListener('pointerup', endDrag);
     canvas.addEventListener('pointercancel', endDrag);
 
+    var knotRaf = 0;
     function animate() {
-      requestAnimationFrame(animate);
+      if (!expActive || document.hidden) { knotRaf = 0; return; }
+      knotRaf = requestAnimationFrame(animate);
       if (!dragging) {
         knot.rotation.y += vy + idle;
         knot.rotation.x += vx;
@@ -1256,7 +1292,8 @@
       }
       renderer.render(scene, camera);
     }
-    animate();
+    window.__startKnot = function () { if (!knotRaf) { animate(); } };
+    window.__startKnot();
   }
 
   /* experience: field of glowing dots that twinkle and get pushed away by the cursor */
@@ -1304,8 +1341,9 @@
     });
     section.addEventListener('mouseleave', function () { mx = -9999; my = -9999; });
 
-    var t = 0;
+    var t = 0, dotsRaf = 0;
     function frame() {
+      if (!expActive || document.hidden) { dotsRaf = 0; return; }
       t += 0.016;
       ctx.clearRect(0, 0, W, H);
       for (var i = 0; i < dots.length; i++) {
@@ -1322,9 +1360,10 @@
         ctx.drawImage(sprite, d.x - s, d.y - s, s * 2, s * 2);
       }
       ctx.globalAlpha = 1;
-      if (!reduceMotion) { requestAnimationFrame(frame); }
+      if (!reduceMotion) { dotsRaf = requestAnimationFrame(frame); }
     }
-    frame();
+    window.__startDots = function () { if (!dotsRaf) { frame(); } };
+    window.__startDots();
   }
 })();
 </script>
