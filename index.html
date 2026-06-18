@@ -82,6 +82,18 @@
     --hero-pad: clamp(126px, 13vw, 168px);
   }
 
+  /* Large desktops / 24"+ monitors: widen the shell so content isn't
+     marooned in the middle. Laptops (<=1599px) keep the exact same look. */
+  @media (min-width: 1600px) {
+    :root {
+      --maxw: 1520px;
+      --gutter: clamp(80px, 7vw, 120px);
+    }
+  }
+  @media (min-width: 2100px) {
+    :root { --maxw: 1680px; }
+  }
+
   /* ============================================================
      RESET / BASE
      ============================================================ */
@@ -998,21 +1010,8 @@
   @keyframes introDraw { to { stroke-dashoffset: 0; } }
   @keyframes introPulse { 0%,100% { opacity: 0.4; transform: scale(0.92); } 50% { opacity: 0.8; transform: scale(1.05); } }
 
-  .cursor-ring, .cursor-dot { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 250; border-radius: 50%; transform: translate(-50%, -50%); opacity: 0; }
-  .cursor-ring {
-    width: 34px; height: 34px; border: 1.5px solid rgba(255,70,70,0.75);
-    transition: width 0.22s ease, height 0.22s ease, background 0.22s ease, border-color 0.22s ease, opacity 0.3s ease;
-    will-change: transform;
-  }
-  .cursor-dot { width: 6px; height: 6px; background: var(--red-bright); box-shadow: 0 0 10px var(--red-bright); transition: opacity 0.3s ease; will-change: transform; }
-  body.has-cursor.cursor-ready .cursor-ring, body.has-cursor.cursor-ready .cursor-dot { opacity: 1; }
-  body.has-cursor { cursor: none; }
-  body.has-cursor a, body.has-cursor button, body.has-cursor .store__swatches i { cursor: none; }
-  .cursor-ring.is-hover { width: 56px; height: 56px; background: rgba(255,45,45,0.14); border-color: var(--red); }
-  .cursor-ring.is-down { width: 26px; height: 26px; }
-
   /* scroll reveals */
-  .reveal { opacity: 0; transform: translateY(34px); transition: opacity 0.8s cubic-bezier(.2,.7,.2,1), transform 0.8s cubic-bezier(.2,.7,.2,1); will-change: opacity, transform; }
+  .reveal { opacity: 0; transform: translateY(34px); transition: opacity 0.8s cubic-bezier(.2,.7,.2,1), transform 0.8s cubic-bezier(.2,.7,.2,1); }
   .reveal.is-in { opacity: 1; transform: none; }
 
   /* oversized ghost section index */
@@ -1039,8 +1038,6 @@
     *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
     .reveal { opacity: 1 !important; transform: none !important; }
     .intro { display: none !important; }
-    .cursor-ring, .cursor-dot { display: none !important; }
-    body.has-cursor { cursor: auto !important; }
     .store { transform: none !important; }
   }
 </style>
@@ -1048,7 +1045,7 @@
 <body>
 <a class="skip-link" href="#hero">Skip to content</a>
 
-<!-- scroll progress + intro + custom cursor -->
+<!-- scroll progress + intro -->
 <div class="scroll-prog" id="scrollProg" aria-hidden="true"></div>
 <div class="intro" id="intro" aria-hidden="true">
   <div class="intro__glow"></div>
@@ -1063,8 +1060,6 @@
     <path class="intro__h" d="M36 30 V70 M64 30 V70 M36 50 H64"/>
   </svg>
 </div>
-<div class="cursor-ring" id="cursorRing" aria-hidden="true"></div>
-<div class="cursor-dot" id="cursorDot" aria-hidden="true"></div>
 
 <!-- ===================== NAV ===================== -->
 <nav class="nav" aria-label="Primary">
@@ -2143,46 +2138,20 @@
     });
   }
 
-  /* ---- custom cursor + magnetic buttons (fine pointers only) ---- */
+  /* ---- magnetic pull on key CTAs (fine pointers only) ---- */
   if (fine && !reduce) {
-    var ring = document.getElementById('cursorRing');
-    var dot = document.getElementById('cursorDot');
-    if (ring && dot) {
-      document.body.classList.add('has-cursor');
-      var mx = window.innerWidth / 2, my = window.innerHeight / 2;
-      var rx = mx, ry = my;
-      var first = true;
-      window.addEventListener('mousemove', function (e) {
-        mx = e.clientX; my = e.clientY;
-        dot.style.transform = 'translate(' + mx + 'px,' + my + 'px) translate(-50%,-50%)';
-        if (first) { first = false; document.body.classList.add('cursor-ready'); rx = mx; ry = my; }
-      }, { passive: true });
-      var craf = function () {
-        rx += (mx - rx) * 0.18; ry += (my - ry) * 0.18;
-        ring.style.transform = 'translate(' + rx + 'px,' + ry + 'px) translate(-50%,-50%)';
-        requestAnimationFrame(craf);
-      };
-      requestAnimationFrame(craf);
-      window.addEventListener('mousedown', function () { ring.classList.add('is-down'); });
-      window.addEventListener('mouseup', function () { ring.classList.remove('is-down'); });
-      var hoverSel = 'a, button, .store__swatches i, .work-toggle';
-      document.addEventListener('mouseover', function (e) { if (e.target.closest(hoverSel)) ring.classList.add('is-hover'); });
-      document.addEventListener('mouseout', function (e) { if (e.target.closest(hoverSel)) ring.classList.remove('is-hover'); });
-
-      /* magnetic pull on key CTAs */
-      var magnets = Array.prototype.slice.call(document.querySelectorAll('.btn--primary, .nav__cta, .contact__email, .work-toggle'));
-      magnets.forEach(function (m) {
-        var strength = 0.32;
-        m.style.transition = (m.style.transition ? m.style.transition + ', ' : '') + 'transform 0.18s ease-out';
-        m.addEventListener('mousemove', function (e) {
-          var r = m.getBoundingClientRect();
-          var dx = e.clientX - (r.left + r.width / 2);
-          var dy = e.clientY - (r.top + r.height / 2);
-          m.style.transform = 'translate(' + (dx * strength).toFixed(1) + 'px,' + (dy * strength).toFixed(1) + 'px)';
-        });
-        m.addEventListener('mouseleave', function () { m.style.transform = ''; });
+    var magnets = Array.prototype.slice.call(document.querySelectorAll('.btn--primary, .nav__cta, .contact__email, .work-toggle'));
+    magnets.forEach(function (m) {
+      var strength = 0.32;
+      m.style.transition = (m.style.transition ? m.style.transition + ', ' : '') + 'transform 0.18s ease-out';
+      m.addEventListener('mousemove', function (e) {
+        var r = m.getBoundingClientRect();
+        var dx = e.clientX - (r.left + r.width / 2);
+        var dy = e.clientY - (r.top + r.height / 2);
+        m.style.transform = 'translate(' + (dx * strength).toFixed(1) + 'px,' + (dy * strength).toFixed(1) + 'px)';
       });
-    }
+      m.addEventListener('mouseleave', function () { m.style.transform = ''; });
+    });
   }
 })();
 </script>
